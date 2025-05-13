@@ -25,11 +25,11 @@ function App() {
       return;
     }
 
-    loadScript('https://id-webcomponent-dev-factory.s3.amazonaws.com/demo/demo.esm.js', "genie-component", "module")
+    loadScript('https://id-webcomponent-sandbox-factory.s3.amazonaws.com/demo/demo.esm.js', "genie-component", "module")
       .then(() => {
         container.insertAdjacentHTML('afterbegin',
           `<genie-component-general 
-              url="${'https://EnrollDev.idfactory.me/verify?SubCustomer=WithHtmltest&key=d8ceca0e84354ab1a6918e34e456b29c24022025105255048'}"
+              url="${'https://EnrollSandbox.idfactory.me/verify?SubCustomer=WithHtmltest&key=d8ceca0e84354ab1a6918e34e456b29c24022025105255048'}"
               token="${'eyJhbGciOiJIUzI1NiIsInR5cCI6IkJlYXJlciJ9.eyJuYW1laWQiOiI0OSIsIm5iZiI6MTc0MDQzNjg3OSwiZXhwIjoxNzQwNDQwNDc5LCJpYXQiOjE3NDA0MzY4NzksImlzcyI6Imh0dHBzOi8vZGV2LmlkZmFjdG9yeS5tZSIsImF1ZCI6Imh0dHBzOi8vZGV2LmlkZmFjdG9yeS5tZSJ9.4lxxWOuC1CZoAtYWwT59fN1aG5yeAuONEaK77QIup48'}">
             </genie-component-general>
           `);
