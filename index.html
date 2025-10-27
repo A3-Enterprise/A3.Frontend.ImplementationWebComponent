@@ -1,16 +1,27 @@
 <!doctype html>
-<html lang="en">
-
-<head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/logo.jpeg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Example Implementation WC</title>
-</head>
-
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
-</body>
-
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Genie Web Component - React Implementation</title>
+    
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+      .header-logo {
+        display: block;
+        margin: 30px auto 20px;
+        max-width: 350px;
+        height: auto;
+        filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+      }
+    </style>
+  </head>
+  <body>
+    <img src="/logo_texto_landscape.svg" alt="Genie Logo" class="header-logo">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
