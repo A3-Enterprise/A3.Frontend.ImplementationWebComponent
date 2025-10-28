@@ -300,6 +300,34 @@ An error occurred during the process.
 - Generate new token
 - Confirm token has necessary permissions
 
+**⚠️ Token Expired During Process:**
+
+If the user leaves the process inactive (e.g., captures selfie and waits more than 1 hour before continuing), the token may expire during the flow. The component automatically detects this situation and emits the event with `message: "Unauthorized"`.
+
+**Handling example:**
+
+```typescript
+document.addEventListener('genieEventGeneral', (event) => {
+  const result = event.detail;
+  
+  if (result.status === 'Failure' && result.message === 'Unauthorized') {
+    // Option 1: Renew token and restart
+    renewToken().then(newToken => {
+      restartComponent(newToken);
+    });
+    
+    // Option 2: Redirect to login
+    window.location.href = '/login?expired=true';
+    
+    // Option 3: Show modal
+    showModal({
+      title: 'Session Expired',
+      message: 'Your session has expired. Please start the process again.'
+    });
+  }
+});
+```
+
 #### Invalid Invitation Key
 
 ```json
