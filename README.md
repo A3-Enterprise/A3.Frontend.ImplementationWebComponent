@@ -566,6 +566,69 @@ function GenieIntegration() {
 </html>
 ```
 
+## 🔒 Requisitos de Content Security Policy (CSP) y Permissions-Policy
+
+> **⚠️ Esta sección solo aplica si tu sitio web tiene headers de seguridad configurados (Content-Security-Policy y/o Permissions-Policy).** Si no tienes estos headers, el componente funcionará sin configuración adicional.
+
+### Content-Security-Policy (CSP)
+
+Si tu sitio tiene una CSP configurada, debes agregar los siguientes dominios según el ambiente:
+
+#### Dominios requeridos
+
+| Directiva | Dominios (Producción) | Propósito |
+|-----------|----------------------|----------|
+| `script-src` | `'unsafe-eval' blob: https://id-webcomponent-prod-factory.s3.amazonaws.com https://ado.sfserv.net https://oz-idfactory-websdk.idfactory.me` | Scripts del WebComponent, Microblink y OZ Liveness |
+| `script-src-elem` | _(mismos que script-src)_ | Scripts como elementos |
+| `style-src` | `'unsafe-inline' https://id-webcomponent-prod-factory.s3.amazonaws.com https://oz-idfactory-websdk.idfactory.me` | Estilos del componente y OZ Liveness |
+| `style-src-elem` | _(mismos que style-src)_ | Estilos como elementos |
+| `connect-src` | `https://idfactory.me https://core-ui-configurations.idfactory.me https://id-webcomponent-prod-factory.s3.amazonaws.com https://ado.sfserv.net https://oz-idfactory-websdk.idfactory.me https://notification.jscrambler.com https://baltazar.microblink.com https://ping.microblink.com` | APIs, configuraciones y servicios biométricos |
+| `frame-src` | `https://core-ui-components.idfactory.me` | Iframe de Liveness V1 y Card Capture V1 |
+| `worker-src` | `blob: https://id-webcomponent-prod-factory.s3.amazonaws.com` | Web Workers de Microblink |
+| `img-src` | `data: https:` | Imágenes del componente |
+| `font-src` | `data: https:` | Fuentes |
+| `media-src` | `blob: data:` | Captura de video/audio |
+
+#### Ejemplo CSP completo (Producción)
+
+```
+script-src 'self' 'unsafe-eval' blob: https://id-webcomponent-prod-factory.s3.amazonaws.com https://ado.sfserv.net https://oz-idfactory-websdk.idfactory.me; style-src 'self' 'unsafe-inline' https://id-webcomponent-prod-factory.s3.amazonaws.com https://oz-idfactory-websdk.idfactory.me; connect-src 'self' https://idfactory.me https://core-ui-configurations.idfactory.me https://id-webcomponent-prod-factory.s3.amazonaws.com https://ado.sfserv.net https://oz-idfactory-websdk.idfactory.me https://notification.jscrambler.com https://baltazar.microblink.com https://ping.microblink.com; frame-src 'self' https://core-ui-components.idfactory.me; worker-src 'self' blob: https://id-webcomponent-prod-factory.s3.amazonaws.com; img-src 'self' data: https:; font-src 'self' data: https:; media-src 'self' blob: data:;
+```
+
+#### Dominios por ambiente
+
+| Ambiente | S3 WebComponent | BFF | Config UI | UI Components |
+|----------|----------------|-----|-----------|---------------|
+| DEV | `id-webcomponent-dev-factory.s3.amazonaws.com` | `dev.idfactory.me` | `core-ui-configurations-dev.idfactory.me` | `core-ui-components-dev.idfactory.me` |
+| Sandbox | `id-webcomponent-sandbox-factory.s3.amazonaws.com` | `sandbox.idfactory.me` | `core-ui-configurations-sandbox.idfactory.me` | `core-ui-components-sandbox.idfactory.me` |
+| Producción | `id-webcomponent-prod-factory.s3.amazonaws.com` | `idfactory.me` | `core-ui-configurations.idfactory.me` | `core-ui-components.idfactory.me` |
+
+> **Nota:** Los dominios `https://ado.sfserv.net`, `https://oz-idfactory-websdk.idfactory.me`, `https://notification.jscrambler.com`, `https://baltazar.microblink.com` y `https://ping.microblink.com` son los mismos en todos los ambientes.
+
+### Permissions-Policy
+
+Si tu sitio tiene un header `Permissions-Policy`, debes permitir cámara y micrófono para el dominio de UI Components (usado por Liveness V1 y Card Capture V1 en iframes):
+
+```
+camera=(self "https://core-ui-components.idfactory.me"), microphone=(self "https://core-ui-components.idfactory.me"), geolocation=(self)
+```
+
+| Ambiente | Dominio para Permissions-Policy |
+|----------|---------------------------------|
+| DEV | `https://core-ui-components-dev.idfactory.me` |
+| Sandbox | `https://core-ui-components-sandbox.idfactory.me` |
+| Producción | `https://core-ui-components.idfactory.me` |
+
+### ¿Cómo saber si necesito configurar esto?
+
+Si al integrar el componente ves errores en la consola del navegador como:
+- `Refused to load the script...` → Necesitas ajustar `script-src`
+- `Refused to connect to...` → Necesitas ajustar `connect-src`
+- `Refused to frame...` → Necesitas ajustar `frame-src`
+- `Permissions policy violation: camera is not allowed` → Necesitas ajustar `Permissions-Policy`
+
+Si no ves ninguno de estos errores, tu sitio no tiene CSP/Permissions-Policy y no necesitas hacer nada.
+
 ## 🔧 Troubleshooting
 
 ### El componente no se carga
