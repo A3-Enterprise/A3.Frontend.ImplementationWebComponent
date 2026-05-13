@@ -300,9 +300,11 @@ Ocurrió un error durante el proceso.
 - Generar un nuevo token
 - Confirmar que el token tenga los permisos necesarios
 
-**⚠️ Token Expirado Durante el Proceso:**
+**⚠️ Token Expirado Durante el Proceso (sin F5):**
 
-Si el usuario deja el proceso inactivo (ej: captura selfie y espera más de 1 hora antes de continuar), el token puede expirar durante el flujo. El componente detecta automáticamente esta situación y emite el evento con `message: "Unauthorized"`.
+Si el usuario deja el proceso activo en pantalla por más de 1 hora sin recargar la página, el token puede expirar mientras el componente sigue montado. El componente detecta automáticamente esta situación en el próximo request y emite `genieEventGeneral` con `status: 'Failure'` y `message: 'Unauthorized'`.
+
+Este comportamiento aplica tanto para el flujo de **Enrollment** como de **Verify**, y tanto cuando el componente es lanzado desde la plataforma Genie (con cookie de sesión) como desde un **cliente externo** (con token prop). En ambos casos el evento se emite de forma garantizada.
 
 **Ejemplo de manejo:**
 
@@ -679,17 +681,174 @@ Para soporte técnico o consultas adicionales:
 - **Documentación:** https://docs.idfactory.me
 - **Portal de Desarrolladores:** https://developers.idfactory.me
 
+## 🔄 Manejo del F5 y Recarga de Página
+
+> **⚠️ CRÍTICO:** Cuando el usuario recarga la página (F5) mientras el WebComponent está activo, el proceso biométrico se interrumpe completamente. El WebComponent se desmonta, pierde su estado y el token en memoria desaparece. Debes implementar una de las tres estrategias descritas a continuación.
+
+### El problema
+
+El token que pasas al WebComponent vive únicamente en memoria JavaScript. Un F5 lo destruye:
+
+```
+Usuario hace F5
+  ↓
+WebComponent se desmonta — proceso perdido
+  ↓
+Tu página recarga — ¿tienes el token disponible para volver a montarlo?
+  ↓
+Si no → WebComponent se monta sin token → Failure: Unauthorized
+```
+
+---
+
+### Estrategia 1 — Bloquear el F5 (Recomendada para procesos críticos)
+
+Impide que el usuario recargue la página mientras el proceso está activo.
+
+```typescript
+useEffect(() => {
+  const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+    e.preventDefault()
+    e.returnValue = '' // Muestra diálogo de confirmación del browser
+  }
+
+  window.addEventListener('beforeunload', handleBeforeUnload)
+
+  return () => {
+    // Desactivar cuando el proceso termina
+    window.removeEventListener('beforeunload', handleBeforeUnload)
+  }
+}, [])
+```
+
+**Cuándo usar:** Procesos donde reiniciar implica generar una nueva invitation key.
+
+---
+
+### Estrategia 2 — Obtener nuevo token desde tu backend (Recomendada para producción)
+
+Al recargar, tu frontend solicita un nuevo token a **tu propio backend**. El token nunca se almacena en el cliente.
+
+```typescript
+// ✅ CORRECTO — token obtenido del backend en cada carga
+function VerificationPage() {
+  const [token, setToken] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/get-genie-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: currentUser.id })
+    })
+      .then(res => res.json())
+      .then(data => setToken(data.token))
+      .catch(() => navigate('/error'))
+  }, [])
+
+  if (!token) return <Loading />
+
+  return <genie-component-general url={invitationUrl} token={token} />
+}
+```
+
+```
+// Tu backend — las credenciales NUNCA llegan al browser
+POST /api/get-genie-token
+  → Llama a la API de Genie con credenciales guardadas en variables de entorno
+  → Retorna el token al frontend
+```
+
+> **⚠️ NUNCA hagas esto:**
+> ```typescript
+> // ❌ INCORRECTO — credenciales expuestas en el frontend
+> const response = await fetch('https://api.genie.com/getToken', {
+>   headers: {
+>     username: 'mi-usuario',  // ← visible en el browser
+>     password: 'mi-password'  // ← visible en el browser
+>   }
+> })
+> ```
+
+**Cuándo usar:** Cuando el proceso puede reiniciarse con la misma o una nueva invitation key.
+
+---
+
+### Estrategia 3 — Manejar el evento `Unauthorized`
+
+Captura el evento `Failure: Unauthorized` y guía al usuario para reiniciar.
+
+```typescript
+document.addEventListener('genieEventGeneral', (event) => {
+  const result = event.detail
+
+  if (result.status === 'Failure' && result.message === 'Unauthorized') {
+    // Opción A: Obtener nuevo token y reiniciar automáticamente
+    getNewTokenFromBackend().then(newToken => {
+      remountComponent(newToken)
+    })
+
+    // Opción B: Redirigir para reiniciar el flujo
+    window.location.href = '/start-verification'
+
+    // Opción C: Mostrar mensaje al usuario
+    showMessage({
+      title: 'Sesión interrumpida',
+      message: 'La página fue recargada. Por favor, inicia el proceso nuevamente.'
+    })
+  }
+})
+```
+
+**Cuándo usar:** Como fallback o cuando el proceso puede reiniciarse fácilmente.
+
+---
+
+### Resumen de estrategias
+
+| Estrategia | Complejidad | UX | Recomendada para |
+|------------|-------------|-----|------------------|
+| Bloquear F5 | Baja | Browser muestra diálogo de confirmación | Procesos críticos de un solo uso |
+| Token desde backend | Media | Transparente para el usuario | Producción — mejor opción de seguridad |
+| Manejar Unauthorized | Baja | Usuario debe reiniciar manualmente | Fallback o procesos reiniciables |
+
+---
+
+### Lo que NUNCA debes hacer
+
+```typescript
+// ❌ NO guardar el token en storage del browser
+localStorage.setItem('genieToken', token)
+sessionStorage.setItem('genieToken', token)
+
+// ❌ NO incluir el token en la URL
+window.location.href = `/verify?token=${token}`
+
+// ❌ NO hardcodear el token en el código fuente
+const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+
+// ❌ NO obtener el token con credenciales desde el frontend
+const token = await fetch('https://api.genie.com/getToken', {
+  headers: { username: 'user', password: 'pass' }
+})
+```
+
+Almacenar el token en el cliente lo expone a ataques XSS. Un script malicioso puede robarlo y usarlo para hacer peticiones en nombre del usuario.
+
+---
+
 ## 📝 Notas Importantes
 
-1. **Seguridad:** Nunca expongas tokens en el código del cliente. Genera tokens dinámicamente desde tu backend.
+1. **Seguridad:** Nunca expongas tokens en el código del cliente. Genera tokens dinámicamente desde tu backend en cada carga de página.
 
-2. **HTTPS:** El componente requiere HTTPS en producción para acceder a la cámara.
+2. **F5 y Recarga:** Implementa una de las tres estrategias descritas arriba. Sin esto, el proceso biométrico se interrumpirá y el usuario recibirá `Failure: Unauthorized`.
 
-3. **Compatibilidad:** El componente funciona en navegadores modernos (Chrome, Firefox, Safari, Edge).
+3. **HTTPS:** El componente requiere HTTPS en producción para acceder a la cámara.
 
-4. **Permisos:** El usuario debe otorgar permisos de cámara y ubicación (si es requerida).
+4. **Compatibilidad:** El componente funciona en navegadores modernos (Chrome, Firefox, Safari, Edge).
 
-5. **Tokens:** Los tokens tienen tiempo de expiración. Implementa renovación automática si es necesario.
+5. **Permisos:** El usuario debe otorgar permisos de cámara y ubicación (si es requerida).
+
+6. **Tokens:** Los tokens tienen tiempo de expiración configurado por tu SubCustomer. Si el usuario deja el proceso inactivo y el token expira, recibirás `Failure: Unauthorized`. Implementa la Estrategia 2 o 3 para manejarlo.
 
 ## 🔄 Changelog
 
